@@ -1,6 +1,5 @@
 /*
- * The sidebar — herdr's anatomy (spaces / agents / footer, and a compact
- * column), drawn by `WorkspaceRail.tsx`.
+ * The sidebar — herdr's anatomy (spaces / agents / footer), drawn by `WorkspaceRail.tsx`.
  *
  * Kept beside `layout.css` rather than in `signal-room.css`: this is the
  * structure of one component, and every colour is a theme token with a
@@ -11,13 +10,30 @@
  */
 
 .sb {
+  --sb-tint: color-mix(in srgb, var(--sidebar-bg, var(--app-panel)) var(--chrome-tint, var(--panel-tint, 38%)), transparent);
+}
+/* Under native glass the panels lay `--glass-overlay` over the material, not
+   the tint (signal-room.css) — the sidebar follows, or it is the one opaque
+   film over real glass. */
+:root[data-native-glass="on"] .sb {
+  --sb-tint: color-mix(in srgb, var(--sidebar-bg, var(--app-panel)) var(--glass-overlay, 14%), transparent);
+}
+
+.sb {
   position: relative;
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  background: var(--sidebar-bg, var(--app-panel));
+  /* Tinted like every `.panel`, never opaque. A solid `--sidebar-bg` here was
+     the one surface the appearance system did not reach: with a photo as the
+     background the sidebar read as a blue-grey slab and the picture appeared
+     to start where the sidebar ended — "shifted to one side". The theme's own
+     sidebar colour is kept as the tint, so the theme still reads as itself;
+     how much of it shows is `--chrome-tint` — the panels' tint, floored under
+     a picture background (`applyAppearance`). */
+  background: var(--sb-tint);
   border-right: 1px solid var(--border);
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: calc(12px * var(--font-scale, 1));
@@ -74,7 +90,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px 3px;
-  background: var(--sidebar-bg, var(--app-panel));
+  /* Sticky, so rows scroll beneath it: the same tint again over the sidebar's
+     own, enough to keep the label readable over a row without a solid band. */
+  background: var(--sb-tint);
   color: var(--overlay0, var(--text-faint));
   font-size: 0.85em;
   font-weight: 700;
@@ -336,37 +354,6 @@
   color: var(--text);
 }
 
-/* ── compact (collapsed) column ──────────────────────────────────────────── */
-
-.sb-compact {
-  width: 44px;
-  align-items: stretch;
-}
-.sb-compact .sb-cell {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 3px 0;
-  color: var(--subtext0, var(--text-soft));
-}
-.sb-compact .sb-cell:hover {
-  background: color-mix(in srgb, var(--text) 5%, transparent);
-}
-.sb-compact .sb-cell[data-active="true"] {
-  background: var(--active-row-bg, color-mix(in srgb, var(--text) 10%, transparent));
-  box-shadow: inset 2px 0 0 var(--accent, var(--text));
-  color: var(--text);
-  font-weight: 700;
-}
-.sb-compact .sb-rule {
-  flex-shrink: 0;
-  height: 1px;
-  margin: 4px 8px;
-  background: var(--border);
-}
-
 /* Parentage — a child an agent spawned (`rmux spawn`). In the agents list it is
    a third line under the name; in the spaces tree a leading ↳ on the row. */
 .sb-agent .sb-parent {
@@ -401,9 +388,6 @@
 }
 .sb-tile[data-focused="true"] {
   color: var(--accent, var(--text));
-}
-.sb-compact .sb-cell[data-shown="true"]:not([data-active="true"]) {
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent, var(--text)) 40%, transparent);
 }
 
 /* ── cards ───────────────────────────────────────────────────────────────── */
@@ -545,4 +529,11 @@
 }
 .sb-row.sb-flash {
   animation: sb-flash 1.6s ease-out;
+}
+
+/* Under a picture the sidebar's faintest labels use `--text-faint`, not
+   herdr's `--overlay0`: overlay0 sits at 3.4:1 even on the *opaque* sidebar,
+   so over a photo no tint short of solid would hold 3:1 with it. */
+:root[data-backdrop="image"] .sb {
+  --overlay0: var(--text-faint);
 }

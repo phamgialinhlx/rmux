@@ -497,6 +497,27 @@ textarea,
   background: color-mix(in srgb, var(--ansi-black) var(--panel-tint, 38%), transparent);
 }
 
+/*
+ * Text-bearing chrome over a picture background gets the floored tint
+ * (`--chrome-tint`, set by `applyAppearance`). A photo is page content behind
+ * text; a translucent panel over it cannot guarantee contrast, so these
+ * surfaces never go below the measured floor while the picture still shows
+ * through, dimmer. Desktop, colour and glass backgrounds never set the
+ * attribute and are unchanged. Native glass is off under a picture by physics.
+ */
+:root[data-backdrop="image"] .chrome-black {
+  background: color-mix(in srgb, var(--ansi-black) var(--chrome-tint), transparent);
+}
+:root[data-backdrop="image"] .chrome-panel {
+  background: color-mix(in srgb, var(--app-panel) var(--chrome-tint), transparent);
+}
+:root[data-backdrop="image"] .tab-bar {
+  background: color-mix(in srgb, var(--panel-bg, var(--app-panel)) var(--chrome-tint), transparent);
+}
+:root[data-backdrop="image"] [data-pane-header] {
+  background: color-mix(in srgb, var(--app-panel) var(--chrome-tint), transparent);
+}
+
 :root[data-native-glass="on"] .chrome-black {
   background: color-mix(in srgb, var(--ansi-black) var(--glass-overlay, 14%), transparent);
 }

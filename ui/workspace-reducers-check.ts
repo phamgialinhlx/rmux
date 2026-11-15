@@ -6,7 +6,7 @@ import {
   removeSession,
   type Core,
 } from "./src/lib/workspace-reducers.ts";
-import { isClaudeSession, reattachName, serverId } from "./src/lib/workspace-model.ts";
+import { adoptedKind, isClaudeSession, isCodexSession, reattachName, serverId } from "./src/lib/workspace-model.ts";
 
 /**
  * The invariants the workspace store's pure transitions must keep. The Zustand
@@ -99,9 +99,34 @@ export function run(log: (line: string) => void): boolean {
     check("and neither is a shell that merely mentions it",
       !isClaudeSession('git commit -m "claude"'));
     check("an unknown command is not a conversation", !isClaudeSession(undefined) && !isClaudeSession(null));
+
+    // rmux's own launch lines put a preamble before the program (issue #16).
+    check("the inline launch line is a conversation", isClaudeSession(
+      "CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 CLAUDE_CODE_DISABLE_MOUSE=1 claude --resume abc --dangerously-skip-permissions"));
+    check("the fullscreen launch line is a conversation",
+      isClaudeSession("CLAUDE_CODE_NO_FLICKER=1 claude --resume abc"));
+    check("unset + assignments + exec is a conversation", isClaudeSession(
+      "unset ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN; CLAUDE_CONFIG_DIR=/home/me/.rmux/c1 exec claude --resume abc"));
+    check("quoted values are skipped", isClaudeSession(
+      `A="x y" B='p q' C="esc \\" quote" claude`));
+    check("shell-escaped single quotes are one value",
+      isClaudeSession(`K='it'\\''s' claude --resume abc`));
+    check("a leading preamble before a shell stays a shell",
+      adoptedKind("FOO=1 bash -c claude") === "terminal");
+    check("an assignment after a command is not a preamble",
+      !isClaudeSession("echo FOO=1 claude"));
+    check("codex behind the preamble is codex",
+      isCodexSession("CODEX_HOME=/x exec codex resume abc") && adoptedKind("CODEX_HOME=/x codex") === "codex");
+    check("a preamble with no program is nothing", adoptedKind("FOO=1 ") === "terminal");
+    check("claude-like names are not claude", !isClaudeSession("claudex --help"));
   }
 
   log("");
   log(failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`);
   return failures === 0;
+}
+
+if (typeof window === "undefined") {
+  const ok = run((line) => console.log(line));
+  if (!ok) (globalThis as { process?: { exitCode?: number } }).process!.exitCode = 1;
 }

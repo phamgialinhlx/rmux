@@ -2,6 +2,7 @@ import type { ServerGroup, Row } from "../lib/mobile-sessions";
 import { totalNeedsYou } from "../lib/mobile-sessions";
 import { ChevronIcon, TerminalIcon } from "./icons";
 import { SHORT_STATE, STATE_LABEL, StateDot } from "./StateDot";
+import { PanelLoader } from "../components/PanelLoader";
 
 const KIND: Record<string, string> = { claude: "Claude", pi: "pi", codex: "Codex", terminal: "terminal" };
 
@@ -35,7 +36,7 @@ function SessionRow({ row, selected, onOpen }: { row: Row; selected: boolean; on
 }
 
 /**
- * Every session this browser's workspace holds, by server then project, agents
+ * Every session the hosts are running (`live.ts`), by server then project, agents
  * first and terminals as a quieter group beneath them. The list itself is the
  * scrolling element and carries its own ceiling — a host holds more sessions
  * than the one you develop against.
@@ -44,10 +45,16 @@ export function SessionList({
   groups,
   selectedId,
   onOpen,
+  loading = false,
+  error = null,
 }: {
   groups: ServerGroup[];
   selectedId: string | null;
   onOpen: (id: string) => void;
+  /** The first read of the hosts' sessions has not answered yet (held ≤2s). */
+  loading?: boolean;
+  /** The last read failed. Rows already listed stay. */
+  error?: string | null;
 }) {
   const waiting = totalNeedsYou(groups);
   return (
@@ -59,12 +66,20 @@ export function SessionList({
         </span>
       </header>
       <nav className="m-list" aria-label="Sessions">
-        {groups.length === 0 ? (
+        {error && (
+          <p className="m-list-note" role="status">
+            Couldn't refresh the list: {error}. Showing what was last known.
+          </p>
+        )}
+        {loading ? (
+          <PanelLoader variant="rows" phase="Reading the host's sessions" />
+        ) : groups.length === 0 ? (
           <div className="m-empty">
-            <p className="m-empty-title">No sessions in this browser yet</p>
+            <p className="m-empty-title">{error ? "Couldn't reach the host" : "Nothing running on this host"}</p>
             <p className="m-empty-body">
-              This list is the workspace rmux-web seeded this browser with. Sessions appear here once the
-              host's seed file includes them; nothing on the host has been changed.
+              {error
+                ? "The list fills in once the host answers. It is retried every few seconds."
+                : "Sessions started on the host or from the desktop app appear here within a few seconds."}
             </p>
           </div>
         ) : (

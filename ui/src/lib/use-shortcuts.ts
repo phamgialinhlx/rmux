@@ -121,6 +121,12 @@ export function useShortcuts(options: {
           state.cycleTab(-1);
           return;
 
+        case "sidebar.left":
+          state.toggleRail();
+          return;
+        case "sidebar.right":
+          state.toggleWidgets();
+          return;
         case "progress":
           onProgress(!progressOpen);
           return;

@@ -22,6 +22,9 @@ fn main() -> ExitCode {
         eprintln!("rmux-web: {e}");
         return ExitCode::from(2);
     }
+    if let Some(warning) = cli::non_loopback_warning(cli.listen) {
+        eprintln!("rmux-web: {warning}");
+    }
 
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)

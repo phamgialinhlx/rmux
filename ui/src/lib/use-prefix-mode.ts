@@ -57,6 +57,9 @@ export function usePrefixKeys(options: {
         case "sidebar":
           state.toggleRail();
           return;
+        case "instruments":
+          state.toggleWidgets();
+          return;
         case "jumpLatest": {
           // The newest outstanding alert first — that is "the latest
           // notification" — then anything waiting that raised none.

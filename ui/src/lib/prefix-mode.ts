@@ -188,6 +188,7 @@ export type PrefixActionId =
   | "help"
   | "settings"
   | "sidebar"
+  | "instruments"
   | "jumpLatest"
   | "project.new"
   | "project.rename"
@@ -226,6 +227,8 @@ export const PREFIX_ACTIONS: readonly PrefixAction[] = [
   { id: "help", label: "Keybinds", group: "Workspace" },
   { id: "settings", label: "Settings", group: "Workspace" },
   { id: "sidebar", label: "Toggle sidebar", group: "Workspace" },
+  // rmux's, not herdr's (herdr has no right rail). `i` for instruments.
+  { id: "instruments", label: "Toggle instruments sidebar", group: "Workspace" },
   { id: "jumpLatest", label: "Jump to the latest notification", group: "Workspace" },
   { id: "project.new", label: "New project", group: "Workspace" },
   { id: "project.rename", label: "Rename project", group: "Workspace" },
@@ -265,6 +268,7 @@ export const PREFIX_DEFAULTS: Record<PrefixActionId, string> = {
   help: "?",
   settings: "s",
   sidebar: "b",
+  instruments: "i",
   jumpLatest: "o",
   "project.new": "N",
   "project.rename": "W",

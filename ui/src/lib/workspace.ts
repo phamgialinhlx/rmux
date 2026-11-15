@@ -317,6 +317,16 @@ type State = Core & {
     cwd?: string | null,
   ) => string;
   /**
+   * Adopt host sessions into this workspace **without touching focus** — the
+   * mobile live list (`mobile-live.ts`). Idempotent by daemon name, placed by
+   * `cwd` like `adoptServerSession`, named by the host alias when there is one.
+   * Nothing is attached and `activeSession` does not move. Returns the new ids.
+   */
+  adoptServerSessionsQuietly: (
+    serverId: ServerId,
+    rows: { hostName: string; kind: SessionKind; alias?: string | null; cwd?: string | null }[],
+  ) => string[];
+  /**
    * Adopt a sub-session an agent spawned on the host (`children.ts` decided
    * it): create its row and place it **beside its parent without moving the
    * focus or the keyboard** — a split of the parent's pane when the parent is in
@@ -429,6 +439,12 @@ type State = Core & {
   /** Close a pane. A session pane **ends that session** (as the rail's ✕) — the
    *  caller confirms first; a host or files pane just closes. */
   closeLeaf: (projectId: ProjectId, tabId: string, leafId: string) => void;
+  /**
+   * Take sessions off the grid **without ending them** (issue #6): their panes
+   * close, their shells and conversations keep running on the host, and the
+   * rail still lists them. Opening one (`activate`) brings it back in a tab.
+   */
+  hideSessions: (ids: string[]) => void;
   toggleZoom: () => void;
   swapPane: (dir: Direction) => void;
   /** Commit a divider position (clamped 0.1–0.9). Called on release, not on
@@ -1075,6 +1091,38 @@ export const useWorkspace = create<State>((set, get) => {
     return id;
   },
 
+  adoptServerSessionsQuietly: (serverId, rows) => {
+    const state = get();
+    let core = coreOf(state);
+    let layout = state.layout;
+    const keepActive = core.activeSession;
+    const runtime = { ...state.runtime };
+    const made: string[] = [];
+    const onServer = () => new Set(core.projects.filter((p) => p.serverId === serverId).map((p) => p.id));
+    for (const row of rows) {
+      const projects = onServer();
+      if (core.sessions.some((x) => projects.has(x.projectId) && reattachName(x) === row.hostName)) continue;
+      const real = row.cwd?.trim();
+      const added = real ? rAddProject(core, serverId, real) : rAddProject(core, serverId, RUNNING_FOLDER, "running");
+      core = added.ws;
+      if (!real) {
+        core = { ...core, projects: core.projects.map((p) => (p.id === added.id ? { ...p, running: true } : p)) };
+      }
+      const label = row.alias?.trim();
+      const id = mintSessionId(row.kind);
+      const name = label || row.hostName;
+      core = rAddSession(core, { id, projectId: added.id, kind: row.kind, name, renamed: !!label, hostName: row.hostName });
+      layout = addTab(layout, added.id, { kind: "session", id }, name, mint).layout;
+      runtime[id] = { ...IDLE };
+      made.push(id);
+    }
+    if (!made.length) return made;
+    // `rAddSession` makes each new session active; a quiet adoption must not.
+    set({ ...core, activeSession: keepActive, layout, runtime });
+    schedulePersist(get);
+    return made;
+  },
+
   adoptChild: (serverId, decision, aspect, area) => {
     const state = get();
     const { child } = decision;
@@ -1240,10 +1288,18 @@ export const useWorkspace = create<State>((set, get) => {
     }));
     schedulePersist(get);
 
-    if (session.kind !== "terminal" || !hasBackend()) return;
+    if (!hasBackend()) return;
     const target = get().targetOf(id);
-    void api
-      .serverAlias(target, reattachName(session), clean)
+    const write = api.serverAlias(target, reattachName(session), clean);
+    // An agent session is often not running on the host (an ended conversation
+    // reopens on demand), and the agent refuses an alias for those — that is
+    // not worth a banner. The name is written on the next rename or the next
+    // start-up sync (`alias-watch.ts`) once it is running.
+    if (session.kind !== "terminal") {
+      void write.catch(() => {});
+      return;
+    }
+    void write
       .then(() => get().setSessionError(id, null))
       // Surfaced rather than swallowed, because the row now shows a name the
       // host does not know — and the next machine to look will disagree with
@@ -1384,6 +1440,11 @@ export const useWorkspace = create<State>((set, get) => {
     }),
 
   activate: (id, opts) => {
+    // A hidden session comes back on the grid when it is opened.
+    if (get().sessions.some((x) => x.id === id && x.hidden)) {
+      set({ sessions: get().sessions.map((x) => (x.id === id ? { ...x, hidden: undefined } : x)) });
+      schedulePersist(get);
+    }
     let layout = get().layout;
     let loc = locateSession(layout, id);
     if (!loc) {
@@ -1519,6 +1580,20 @@ export const useWorkspace = create<State>((set, get) => {
       return;
     }
     land(lCloseLeaf(get().layout, projectId, tabId, leafId), { keyboard: true });
+  },
+
+  hideSessions: (ids) => {
+    const state = get();
+    const hide = new Set(ids.filter((id) => state.sessions.some((x) => x.id === id)));
+    if (!hide.size) return;
+    let layout = state.layout;
+    for (const id of hide) layout = removeSessionLeaves(layout, id);
+    // Flag first, so the normalize inside `land` does not place them again.
+    set({ sessions: state.sessions.map((x) => (hide.has(x.id) ? { ...x, hidden: true } : x)) });
+    land(layout, { keyboard: true });
+    schedulePersist(get);
+    const heir = focusedLeaf(get().layout);
+    if (heir?.pane.kind === "session") focusKeyboard(heir.pane.id);
   },
 
   toggleZoom: () => land(lToggleZoom(get().layout)),

@@ -1,0 +1,14 @@
+# rmux-web serving the phone/tablet bundle on its own port. Same host, same
+# sessions, same token; only the UI differs. Installed by install.sh.
+[Unit]
+Description=rmux-web (mobile UI)
+After=network-online.target
+
+[Service]
+EnvironmentFile=-%h/.rmux-web/env
+ExecStart=%h/.rmux-web/rmux-web --ui %h/.rmux-web/ui-mobile --resources %h/.rmux-web/resources --token-file %h/.rmux-web/token --listen 127.0.0.1:47111 $RMUX_WEB_ARGS
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

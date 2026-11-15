@@ -69,6 +69,69 @@ lines, NUL-separated listings, length-framed reads, copy-over-original saves,
 noclobber uploads, secrets never in argv, `Tty::None` for one-shots. Moving a command
 is a **move**, not a rewrite: behaviour must be byte-for-byte what it was.
 
+## Self-hosting on a Linux dev box
+
+No compiler, Rust or Node is needed on the host. On a Mac with the build tools:
+
+```sh
+scripts/build-agents.sh                 # once per version
+scripts/package-web.sh x86_64           # or aarch64
+scp target/rmux-web-<version>-x86_64-linux.tar.gz <host>:
+```
+
+`package-web.sh` cross-compiles a static musl `rmux-web` with zig (the same reasoning
+as the agent: no glibc floor, runs on any Linux) and bundles the agents and both UI
+bundles. On the host:
+
+```sh
+tar xzf rmux-web-<version>-x86_64-linux.tar.gz && cd rmux-web-<version>-x86_64-linux
+./install.sh                            # --no-mobile to skip the phone UI
+sudo loginctl enable-linger $USER       # once: keep it running after logout/reboot
+```
+
+`install.sh` lays the files out in `~/.rmux-web` (`rmux-web`, `resources/agents/`,
+`ui/`, `ui-mobile/`), keeps the previous install in `~/.rmux-web/old-<version>-<time>`,
+creates `~/.rmux-web/token` once (`0600`, never printed, kept across upgrades) and
+enables two systemd **user** units: `rmux-web` on `127.0.0.1:47110` (desktop UI) and
+`rmux-mobile-web` on `127.0.0.1:47111` (phone UI). Extra flags — Cloudflare Access, for
+instance — go in `~/.rmux-web/env`:
+
+```sh
+RMUX_WEB_ARGS="--access-team myteam.cloudflareaccess.com --access-aud <AUD> --access-email me@example.com"
+```
+
+Upgrading is the same two commands with the newer package. `agents/VERSION` must match
+the `rmux-web` build, which `package-web.sh` checks.
+
+No seed file is needed any more: the mobile list reads the host's running sessions
+live (`host_sessions`, every 10s while the page is visible), and names given on the
+desktop reach it through the host's `~/.rmux/aliases.json`.
+
+## On a LAN
+
+rmux-web speaks **plain HTTP**. Bound to loopback that is fine — every way in (the host
+itself, an SSH tunnel, cloudflared) is already encrypted. `--listen <lan-ip>:47110
+--allow-non-loopback` works, but then the token (in `#token=` on first load, then a
+`Bearer` header and `?token=` on `/api/ws`) and every keystroke cross the network
+readable, and anyone who captures them has a shell. rmux-web prints a warning saying
+so when it starts on a non-loopback address.
+
+Better, in order:
+
+1. **Tailscale** (or another WireGuard mesh). Install it on the host and the phone and
+   keep rmux-web on loopback, then `tailscale serve --bg --https=443 http://127.0.0.1:47111`
+   publishes it on the tailnet with a real certificate. Encrypted, device-scoped, and it
+   works off the LAN too. A secure context also makes the clipboard buttons work.
+2. **An SSH tunnel** from a laptop: `ssh -N -L 47110:127.0.0.1:47110 <host>`.
+3. **cloudflared + Cloudflare Access**, as the main deployment above.
+
+If you do bind a LAN address, open the port to your subnet only — with `ufw` on, the
+page otherwise just times out:
+
+```sh
+sudo ufw allow from 192.168.1.0/24 to any port 47110 proto tcp
+```
+
 ## Phases
 
 1. Prototype: rmux-app + registry + Tauri bridge; terminals, files, Claude, pi, git
@@ -78,6 +141,8 @@ is a **move**, not a rewrite: behaviour must be byte-for-byte what it was.
    and the Origin check: done. Seeding a new browser's workspace from the host: done.)
 4. Phone/iPad layout: one pane, drawer rail, a key bar (Esc, Tab, Ctrl, arrows).
 5. Provisioned/upgraded from the desktop; workspace stored on the host and shared.
+   (Packaged install with `scripts/package-web.sh` + `install.sh`: done. The desktop
+   pushing it is not.)
 
 ## The mobile bundle
 
@@ -87,6 +152,10 @@ served by its own rmux-web instance with `--ui dist-mobile`; nothing else change
 Which UI a browser gets is decided by which bundle that instance serves, never by a
 hostname or a user agent.
 
+- The list is the host's running sessions, read live (`ui/src/mobile/live.ts`:
+  `host_sessions` on load and every 10s while visible). New ones are adopted quietly
+  (`adoptServerSessionsQuietly`, no focus change); ones whose daemon ended are hidden
+  by a view filter, never closed. A failed read hides nothing.
 - Same `bridge.ts`, same `/api/seed`, same commands. The conversation is the
   transcript (`claude_transcript` / `pi_transcript` / `codex_transcript`, tail
   only); a message is `claude_send` (with `agent: "pi"` for pi's multi-line

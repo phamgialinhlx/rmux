@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { leaves, tabLabel, tabsOf, type Direction } from "../lib/layout-tree";
+import { findLeaf, leaves, tabLabel, tabsOf, type Direction } from "../lib/layout-tree";
 import { label as chordLabel, readBindings, requestClose, type ActionId } from "../lib/shortcuts";
 import { useWorkspace } from "../lib/workspace";
 import { beginSessionDrag, currentSessionDrag, endSessionDrag, isSessionDrag, useSessionDrag } from "../lib/session-drag";
@@ -64,6 +64,7 @@ export function TabBar({
   const newTab = useWorkspace((s) => s.newTab);
   const splitPane = useWorkspace((s) => s.splitPane);
   const toggleZoom = useWorkspace((s) => s.toggleZoom);
+  const hideSessions = useWorkspace((s) => s.hideSessions);
   const swapPane = useWorkspace((s) => s.swapPane);
 
   const [editing, setEditing] = useState<string | null>(null);
@@ -91,6 +92,8 @@ export function TabBar({
   }, [into, activeId, pid]);
   const at = activeOne ? { projectId: pid, tab: activeOne } : null;
   const paneCount = at ? leaves(at.tab.root).length : 0;
+  const focusedPane = at ? findLeaf(at.tab.root, at.tab.focus)?.pane : undefined;
+  const focusedSessionId = focusedPane?.kind === "session" ? focusedPane.id : null;
   const nameOf = (id: string) => sessions.find((s) => s.id === id)?.name;
   const bindings = readBindings();
   const hint = (id: ActionId) => (bindings[id] ? ` (${chordLabel(bindings[id])})` : "");
@@ -304,6 +307,17 @@ export function TabBar({
           >
             <PaneGlyph d="M7 7h13l-4-4M17 17H4l4 4" />
           </button>
+          {focusedSessionId && (
+            <button
+              type="button"
+              className="pane-tool"
+              aria-label="Hide pane"
+              title="Hide this pane — its session keeps running and stays in the sidebar; click it there to bring it back"
+              onClick={() => hideSessions([focusedSessionId])}
+            >
+              <PaneGlyph d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6zM4 20L20 4" />
+            </button>
+          )}
           <button
             type="button"
             className="pane-tool"

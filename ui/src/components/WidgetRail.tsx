@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { motion, Reorder, useDragControls } from "motion/react";
+import { Reorder, useDragControls } from "motion/react";
 
 import { HostStatus } from "./widgets/HostStatus";
 import { PanelLoader } from "./PanelLoader";
@@ -64,9 +64,6 @@ export type Active = {
  */
 
 const RAIL_DEFAULT = 244;
-/** Collapsed removes the rail from the layout entirely (see the note at its use).
- *  Re-opening is the footer toggle, so nothing needs to stay on screen. */
-const RAIL_COLLAPSED = 0;
 /** Samples kept for the history chart. Its x-axis is "the last 30", so an
  *  unbounded buffer would quietly change what the chart means. */
 const HISTORY = 30;
@@ -801,9 +798,10 @@ const LABELS: Record<InstrumentId, string> = {
 };
 
 export function WidgetRail({ session }: { session: Active | null }) {
-  // Collapse lives in the workspace store, so the footer's mirror of the servers
-  // toggle can drive it too — the rail is on the right, the toggle at bottom-right.
-  const collapsed = useWorkspace((s) => s.widgetsCollapsed);
+  // Hidden is decided by `Workbench`, which does not mount this at all: off
+  // means off, so every instrument's poller stops with it. A width-0 box kept
+  // its 1px borders — a 2px line down the right edge.
+  //
   // Not persisted: this is a mode you are *in*, not a preference. Reopening the
   // app into a settings list rather than the instruments would be a surprise.
   const [customising, setCustomising] = useState(false);
@@ -811,68 +809,56 @@ export function WidgetRail({ session }: { session: Active | null }) {
   const { width: railWidth, startResize } = useRailWidth("rmux.widgets.width", RAIL_DEFAULT);
 
   return (
-    <motion.aside
-      className="panel relative flex shrink-0 flex-col overflow-hidden"
-      // Collapsed goes to width 0 — the rail leaves the layout entirely rather
-      // than parking a strip on the right edge. The footer toggle is the way
-      // back, so a collapsed remnant would only be a second, redundant control.
-      animate={{ width: collapsed ? RAIL_COLLAPSED : railWidth }}
-      transition={{ type: "spring", stiffness: 320, damping: 34 }}
-      style={{ width: collapsed ? RAIL_COLLAPSED : railWidth }}
-    >
+    <aside className="panel chrome-panel relative flex shrink-0 flex-col overflow-hidden" style={{ width: railWidth }}>
       {/* This rail sits on the right, so its grip is on its *left* edge and the
           drag direction is inverted — see `useRailWidth`. */}
-      {!collapsed && <RailGrip side="left" onPointerDown={(e) => startResize(e, "right")} />}
-      {!collapsed && (
-        <>
-          <header
-            className="flex shrink-0 items-center justify-between border-b px-2 py-2"
-            style={{ borderColor: "var(--border)" }}
+      <RailGrip side="left" onPointerDown={(e) => startResize(e, "right")} />
+      <header
+        className="flex shrink-0 items-center justify-between border-b px-2 py-2"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={customising}
+          onClick={() => setCustomising((c) => !c)}
+          title={
+            customising
+              ? "Back to the instruments"
+              : "Choose which instruments run. A widget switched off is unmounted, not hidden — it stops using memory."
+          }
+        >
+          {/* Sliders, because the label alone was the problem. Deliberately
+              coarse: at 10px anything finer than three strokes is mush, and a
+              mark nobody can resolve is decoration. Square caps, 2px, per the
+              icon rule. */}
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="square"
+            aria-hidden="true"
           >
-            <button
-              type="button"
-              className="chip"
-              aria-pressed={customising}
-              onClick={() => setCustomising((c) => !c)}
-              title={
-                customising
-                  ? "Back to the instruments"
-                  : "Choose which instruments run. A widget switched off is unmounted, not hidden — it stops using memory."
-              }
-            >
-              {/* Sliders, because the label alone was the problem. Deliberately
-                  coarse: at 10px anything finer than three strokes is mush, and a
-                  mark nobody can resolve is decoration. Square caps, 2px, per the
-                  icon rule. */}
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="square"
-                aria-hidden="true"
-              >
-                <path d="M3 7h18M3 17h18" />
-                <path d="M9 4v6M16 14v6" />
-              </svg>
-              {customising ? "DONE" : "INSTRUMENTS"}
-            </button>
-            {/* Collapse is driven from the footer's mirror of the servers toggle
-                (`Workbench` footer, bottom-right), not from an in-rail chip — one
-                consistent affordance per bar. */}
-          </header>
+            <path d="M3 7h18M3 17h18" />
+            <path d="M9 4v6M16 14v6" />
+          </svg>
+          {customising ? "DONE" : "INSTRUMENTS"}
+        </button>
+        {/* Collapse is driven from the footer's mirror of the servers toggle
+            (`Workbench` footer, bottom-right), not from an in-rail chip — one
+            consistent affordance per bar. */}
+      </header>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-2">
-            {session ? (
-              <Instruments session={session} customising={customising} />
-            ) : (
-              <span className="micro">no session selected</span>
-            )}
-          </div>
-        </>
-      )}
-    </motion.aside>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-2">
+        {session ? (
+          <Instruments session={session} customising={customising} />
+        ) : (
+          <span className="micro">no session selected</span>
+        )}
+      </div>
+    </aside>
   );
 }

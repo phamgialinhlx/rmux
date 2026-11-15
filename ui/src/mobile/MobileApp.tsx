@@ -3,6 +3,9 @@ import { useEffect, useMemo } from "react";
 import { useWorkspace } from "../lib/workspace";
 import { startStatusWatch } from "../lib/status-watch";
 import { groupSessions } from "../lib/mobile-sessions";
+import { liveFilter } from "../lib/mobile-live";
+import { reattachName } from "../lib/workspace-model";
+import { useLiveSessions } from "./live";
 import { useVisualViewport } from "./viewport";
 import { useRoute } from "./route";
 import { SessionList } from "./SessionList";
@@ -30,9 +33,18 @@ export function MobileApp() {
   const runtime = useWorkspace((s) => s.runtime);
   const seen = useWorkspace((s) => s.seen);
 
+  const liveState = useLiveSessions();
+  // Rows whose daemon ended are hidden — a view filter; nothing is closed.
+  const shown = useMemo(() => {
+    const serverOfProject = new Map(projects.map((p) => [p.id, p.serverId]));
+    let rows = sessions.map((s) => ({ ...s, key: reattachName(s), serverId: serverOfProject.get(s.projectId) ?? "" }));
+    for (const [serverId, live] of Object.entries(liveState.live)) rows = liveFilter(rows, serverId, live);
+    return rows;
+  }, [sessions, projects, liveState.live]);
+
   const groups = useMemo(
-    () => groupSessions({ servers, projects, sessions, runtime, seen }),
-    [servers, projects, sessions, runtime, seen],
+    () => groupSessions({ servers, projects, sessions: shown, runtime, seen }),
+    [servers, projects, shown, runtime, seen],
   );
 
   const selected = route.session ? sessions.find((s) => s.id === route.session && SHOWN_KINDS.has(s.kind)) : undefined;
@@ -40,7 +52,13 @@ export function MobileApp() {
   return (
     <div className="m-app" data-screen={route.session ? "chat" : "list"}>
       <aside className="m-pane-list">
-        <SessionList groups={groups} selectedId={route.session} onOpen={open} />
+        <SessionList
+          groups={groups}
+          selectedId={route.session}
+          onOpen={open}
+          loading={liveState.loading}
+          error={liveState.error}
+        />
       </aside>
       <main className="m-pane-chat">
         {selected ? (

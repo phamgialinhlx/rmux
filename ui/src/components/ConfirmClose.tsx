@@ -27,6 +27,7 @@ export function ConfirmClose() {
   const cancel = useRef<HTMLButtonElement>(null);
   const closeTab = useWorkspace((s) => s.closeTab);
   const closeLeaf = useWorkspace((s) => s.closeLeaf);
+  const hideSessions = useWorkspace((s) => s.hideSessions);
 
   useEffect(() => {
     const onAsk = (e: Event) => {
@@ -94,6 +95,16 @@ export function ConfirmClose() {
     if (ask.leafId) closeLeaf(ask.projectId, ask.tabId, ask.leafId);
     else closeTab(ask.projectId, ask.tabId);
   };
+  // Issue #6: off the grid, still running. For a tab, whatever is left once its
+  // sessions are hidden (files, host panes) ends nothing and closes as usual.
+  const hide = () => {
+    setAsk(null);
+    hideSessions(ids);
+    if (!ask.leafId) {
+      const left = tabsOf(useWorkspace.getState().layout, ask.projectId).tabs.find((t) => t.id === ask.tabId);
+      if (left) closeTab(ask.projectId, ask.tabId);
+    }
+  };
 
   return (
     <div
@@ -120,11 +131,15 @@ export function ConfirmClose() {
         </ul>
         <span className="data text-[11px] leading-relaxed" style={{ color: "var(--text-faint)" }}>
           {n === 1 ? "Its shell or conversation is stopped on the host." : "Their shells and conversations are stopped on the host."}{" "}
-          To step away and keep it running, use Detach in the rail's right-click menu.
+          To clear the grid and keep {n === 1 ? "it" : "them"} running, choose hide: {n === 1 ? "it stays" : "they stay"} in
+          the sidebar, and clicking {n === 1 ? "it" : "one"} there brings it back.
         </span>
         <div className="flex justify-end gap-2">
           <button ref={cancel} type="button" className="chip" onClick={() => setAsk(null)}>
             cancel
+          </button>
+          <button type="button" className="chip" onClick={hide}>
+            {n === 1 ? "hide, keep running" : `hide all ${n}, keep running`}
           </button>
           <button type="button" className="chip" style={{ color: "rgb(var(--primary))" }} onClick={confirm}>
             {n === 1 ? "end it" : `end all ${n}`}

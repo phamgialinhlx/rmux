@@ -48,6 +48,44 @@ export const SESSIONS = [
   },
 ];
 
+/** The daemon name rmux attaches a fixture session by (`reattachName`). */
+const daemonName = (s) => (s.kind === "terminal" ? s.id : `${s.kind}-${s.id}`);
+
+/**
+ * `host_sessions` for a target: the fixture sessions on that server, plus one
+ * the desktop started after the seed was written — so the live list has
+ * something to adopt — named by its host alias.
+ */
+function hostSessions(target) {
+  const server = target.host ? DEVBOX : LOCAL;
+  const folders = new Map([P_API, P_WEB, P_SRV].map((p) => [p.id, p]));
+  const rows = SESSIONS.filter((s) => folders.get(s.projectId)?.serverId === server.id).map((s) => ({
+    name: daemonName(s),
+    alias: null,
+    pid: 4000,
+    ageSeconds: 600,
+    attached: false,
+    command: s.kind === "terminal" ? "bash" : `CLAUDE_CODE_NO_FLICKER=1 ${s.kind} --resume ${s.resume ?? "x"}`,
+    memory: null,
+    cpu: null,
+    cwd: folders.get(s.projectId)?.folder ?? null,
+  }));
+  if (server === LOCAL) {
+    rows.push({
+      name: "claude-session-livenew",
+      alias: "Add rate limits to the export endpoint",
+      pid: 4100,
+      ageSeconds: 30,
+      attached: false,
+      command: "CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1 CLAUDE_CODE_DISABLE_MOUSE=1 claude --resume conv-live",
+      memory: null,
+      cpu: null,
+      cwd: P_API.folder,
+    });
+  }
+  return rows;
+}
+
 function seed() {
   const workspace = {
     version: 3,
@@ -292,6 +330,8 @@ export function rmuxFixture() {
       case "claude_send":
         await new Promise((r) => setTimeout(r, 400));
         return null;
+      case "host_sessions":
+        return hostSessions(args.target ?? {});
       case "claude_list_sessions":
       case "claude_list_all_sessions":
       case "pi_list_all_sessions":

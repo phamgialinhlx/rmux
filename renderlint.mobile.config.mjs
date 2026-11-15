@@ -70,9 +70,36 @@ export default {
       delay: 1500,
     },
     {
-      name: "no sessions in this browser",
+      // No seed: the list comes from the host's live listing alone (#17).
+      name: "no seed, listed live from the host",
       page: "/",
       mock: { "**/api/seed": { status: 404, json: { message: "no seed configured" } } },
+    },
+    {
+      name: "nothing running on the host",
+      page: "/",
+      mock: {
+        "**/api/seed": { status: 404, json: { message: "no seed configured" } },
+        "**/api/invoke/host_sessions": { json: [] },
+      },
+    },
+    {
+      name: "host listing slow",
+      page: "/",
+      mock: {
+        "**/api/seed": { status: 404, json: { message: "no seed configured" } },
+        "**/api/invoke/host_sessions": { json: [], delay: 20000 },
+      },
+    },
+    {
+      name: "host listing failed, seeded rows stay",
+      page: "/",
+      mock: {
+        "**/api/invoke/host_sessions": {
+          status: 500,
+          json: { message: "ssh: connect to host devbox port 22: Connection timed out" },
+        },
+      },
     },
   ],
   // Only the mobile sources: the desktop UI has its own conventions.

@@ -80,6 +80,12 @@ export type SessionV3 = {
   kind: SessionKind;
   name: string;
   renamed?: boolean;
+  /**
+   * Taken off the grid but **still running** on the host (issue #6). No pane
+   * shows it and `normalizeLayout` does not give it one back; the rail still
+   * lists it, and opening it from there clears the flag and gives it a tab.
+   */
+  hidden?: boolean;
 
   /**
    * The daemon session name to attach to **verbatim**, for adopted sessions.
@@ -246,12 +252,38 @@ export function reattachName(s: Pick<SessionV3, "id" | "kind" | "hostName">): st
  * `git commit -m "claude"` is still a shell.
  */
 export function isClaudeSession(command: string | null | undefined): boolean {
-  return command === "claude" || command?.startsWith("claude ") === true;
+  return programOf(command) === "claude";
 }
 
 /** The same test for Codex — `codex` and `codex …`, never a substring. */
 export function isCodexSession(command: string | null | undefined): boolean {
-  return command === "codex" || command?.startsWith("codex ") === true;
+  return programOf(command) === "codex";
+}
+
+/**
+ * The program a daemon command line runs, past a *leading* preamble.
+ *
+ * rmux's own launch lines put rendering variables first
+ * (`CLAUDE_CODE_NO_FLICKER=1 claude …`), and a named credential set prefixes
+ * `unset K…; … exec claude`. Skipped, in order and only at the front: `unset …;`
+ * statements, `NAME=value` assignments (bare, single- or double-quoted) and
+ * `exec`. Anything else ends the preamble, so `echo FOO=1 claude` and
+ * `git commit -m "claude"` stay shells.
+ */
+export function programOf(command: string | null | undefined): string | null {
+  if (!command) return null;
+  let rest = command.trimStart();
+  for (;;) {
+    const unset = /^unset(?:\s+[A-Za-z_][A-Za-z0-9_]*)*\s*;\s*/.exec(rest);
+    if (unset) { rest = rest.slice(unset[0].length); continue; }
+    const assign = /^[A-Za-z_][A-Za-z0-9_]*=(?:"(?:[^"\\]|\\.)*"|'[^']*'|\\.|[^\s;'"\\])*(?:\s+|$)/.exec(rest);
+    if (assign) { rest = rest.slice(assign[0].length); continue; }
+    const exec = /^exec(?:\s+|$)/.exec(rest);
+    if (exec) { rest = rest.slice(exec[0].length); continue; }
+    break;
+  }
+  const word = /^[^\s;]+/.exec(rest);
+  return word ? word[0] : null;
 }
 
 /**

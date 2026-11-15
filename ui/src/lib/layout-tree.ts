@@ -1307,7 +1307,7 @@ export function setViewRatio(layout: Layout, splitId: string, ratio: number): La
 export type Pool = {
   servers: Pick<Server, "id">[];
   projects: Pick<Project, "id">[];
-  sessions: Pick<SessionV3, "id" | "projectId" | "name">[];
+  sessions: (Pick<SessionV3, "id" | "projectId" | "name"> & { hidden?: boolean })[];
 };
 
 /**
@@ -1371,7 +1371,8 @@ export function normalizeLayout(layout: Layout, pool: Pool, mint: Mint): Layout 
 
   let next: Layout = { activeProject: layout.activeProject, projects, view: layout.view };
   for (const s of pool.sessions) {
-    if (placed.has(s.id) || !projectIds.has(s.projectId)) continue;
+    // A hidden session stays off the grid on purpose (`SessionV3.hidden`).
+    if (placed.has(s.id) || !projectIds.has(s.projectId) || s.hidden) continue;
     changed = true;
     placed.add(s.id);
     next = addTab(next, s.projectId, { kind: "session", id: s.id }, s.name, mint, { activate: false }).layout;

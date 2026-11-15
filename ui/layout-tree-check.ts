@@ -363,6 +363,14 @@ export function run(log: (line: string) => void): boolean {
         { ...pool, sessions: [] },
         counterMint(),
       ).projects.p1!.tabs.length === 0);
+    // Issue #6: a hidden session stays off the grid; un-hidden, it is placed again.
+    {
+      const hiddenPool = { ...pool, sessions: pool.sessions.map((x) => (x.id === "s4" ? { ...x, hidden: true } : x)) };
+      const H = normalizeLayout(broken, hiddenPool, counterMint());
+      check("a hidden session is not given a tab back", locateSession(H, "s4") === null);
+      check("the others are still placed", locateSession(H, "s1") !== null && locateSession(H, "s3") !== null);
+      check("un-hidden, it is placed again", locateSession(normalizeLayout(H, pool, counterMint()), "s4") !== null);
+    }
     check("a corrupt stored layout parses to empty rather than throwing",
       Object.keys(parseLayout({ projects: { p1: { tabs: [{ id: 1 }, null], activeTab: 3 } } }).projects.p1!.tabs).length === 0 &&
         parseLayout("garbage").activeProject === null);

@@ -135,6 +135,27 @@ pub fn check_listen(addr: SocketAddr, allow_non_loopback: bool) -> Result<(), St
     }
 }
 
+/// What to print when rmux-web is told to listen beyond loopback (issue #19).
+///
+/// `None` on loopback. Otherwise a warning that the traffic is plain HTTP — the
+/// token and every keystroke cross the network readable — and the two things
+/// that usually trip a LAN setup: a firewall silently dropping the port, and the
+/// browser treating a non-HTTPS origin as insecure (clipboard buttons fail).
+pub fn non_loopback_warning(addr: SocketAddr) -> Option<String> {
+    if addr.ip().is_loopback() {
+        return None;
+    }
+    let port = addr.port();
+    Some(format!(
+        "WARNING: listening on {addr} over plain HTTP. The access token and all terminal \
+         traffic cross the network unencrypted; anyone who can capture it gets a shell here. \
+         Prefer loopback plus an SSH tunnel, cloudflared, or a Tailscale address \
+         (see docs/rmux-web.md \"On a LAN\"). If the page times out, open the port to your \
+         subnet only, e.g. `ufw allow from 192.168.1.0/24 to any port {port} proto tcp`. \
+         Browsers also restrict the clipboard on a plain-HTTP origin."
+    ))
+}
+
 /// A fresh per-run token: 32 bytes from the OS RNG, hex.
 pub fn generate_token() -> anyhow::Result<String> {
     use rand::TryRngCore as _;
@@ -258,5 +279,15 @@ mod tests {
         assert_eq!(read_token_file(&path).unwrap(), "0123456789abcdef0123");
         std::fs::write(&path, "short").unwrap();
         assert!(read_token_file(&path).is_err());
+    }
+
+    #[test]
+    fn non_loopback_warns_about_plaintext_and_the_firewall() {
+        let lan: SocketAddr = "10.0.0.5:47110".parse().unwrap();
+        let w = non_loopback_warning(lan).expect("a LAN address warns");
+        assert!(w.contains("plain HTTP"), "{w}");
+        assert!(w.contains("port 47110"), "{w}");
+        assert!(non_loopback_warning("127.0.0.1:47110".parse().unwrap()).is_none());
+        assert!(non_loopback_warning("[::1]:47110".parse().unwrap()).is_none());
     }
 }

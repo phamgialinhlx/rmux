@@ -194,6 +194,17 @@ const DEFAULTS: Appearance = {
   agentIndicators: "dots",
 };
 
+/**
+ * The least tint text-bearing chrome gets over a picture background.
+ *
+ * Measured, not chosen: the lowest value at which body text holds 4.5:1 and
+ * `--text-faint` 3:1 over a near-white photo (the worst case) on the lightest
+ * chrome surface (the sidebar, `--sidebar-bg`). Sampled from rendered pixels:
+ * at 90% the sidebar holds 8.3:1 / 3.4:1 over near-white; at 85% its faint
+ * labels fell to 2.84:1. See CLAUDE.md, Design system.
+ */
+export const PICTURE_CHROME_FLOOR = 90;
+
 /** The colour the old default backdrop painted, before `theme` existed. */
 const OLD_DEFAULT_BACKDROP = "#0b0b0d";
 
@@ -266,7 +277,20 @@ export function applyAppearance(a: Appearance = load()) {
   // to sit on top of an opaque blur layer and looked like glass; on its own it
   // is very nearly solid, so an old setting would leave the operator with the
   // exact bug they just watched get fixed.
-  root.style.setProperty("--panel-tint", `${Math.min(a.tint, 60)}%`);
+  const tint = Math.min(a.tint, 60);
+  root.style.setProperty("--panel-tint", `${tint}%`);
+  // **Chrome under a picture has a floor.** A photo is page content behind
+  // text, and a translucent panel over it cannot promise contrast — at the
+  // default 38% the sidebar's faint labels measured 1.1:1 over a bright
+  // wallpaper. So the text-bearing chrome (sidebar, instruments, footer, title
+  // bar, tab bar, pane headers) reads `--chrome-tint`, which is the stored tint
+  // everywhere except under a picture, where it is at least
+  // `PICTURE_CHROME_FLOOR`. Pane bodies keep `--panel-tint`: a terminal paints
+  // its own content and the slider still moves them.
+  const picture = a.background === "image" && !!a.backgroundImage;
+  root.style.setProperty("--chrome-tint", `${picture ? Math.max(tint, PICTURE_CHROME_FLOOR) : tint}%`);
+  if (picture) root.dataset.backdrop = "image";
+  else delete root.dataset.backdrop;
   root.style.setProperty("--glass-overlay", `${Math.min(Math.max(a.overlay, 0), 50)}%`);
 
   // --- what sits behind the app -------------------------------------------
@@ -891,7 +915,9 @@ export function AppearancePanel() {
           )
         : row(
             "GLASS",
-            "Lower shows more desktop. Too low and 9px labels stop being readable over a bright wallpaper.",
+            draft.background === "image"
+              ? `Lower shows more of the picture through the panes. With a picture background the sidebars, tab bar, pane headers and footer stay at least ${PICTURE_CHROME_FLOOR}% so their text reads over any photo.`
+              : "Lower shows more desktop. Too low and 9px labels stop being readable over a bright wallpaper.",
             draft.tint,
             20,
             100,

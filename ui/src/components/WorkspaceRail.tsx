@@ -57,9 +57,10 @@ import { QuickAdd } from "./QuickAdd";
  * 2. a draggable divider (the split is remembered);
  * 3. **agents** — every Claude/pi session on every machine, `grouped` in the
  *    spaces order or by `priority` (most urgent, then most recent);
- * 4. a footer: ` new` and the `«` that folds this into
- * 5. the **compact column** — each space's number and rolled-up state, then
- *    each agent's state, click to go there.
+ * 4. a footer: ` new` and the `«` that hides the sidebar **completely** — no
+ *    compact column (the numbered strip it used to leave was reported as
+ *    clutter). `Workbench` unmounts it; the footer's left icon, the
+ *    `sidebar.left` shortcut and `ctrl+b b` bring it back.
  *
  * It still answers the one question the rail exists for — "which of my
  * machines needs me?" — through one mapping (`agent-state.ts`): blocked, done,
@@ -1140,62 +1141,6 @@ function MachineGroup({
   );
 }
 
-// ── the compact column ───────────────────────────────────────────────────────
-
-function CompactRail({ model, sort, onExpand }: { model: Model; sort: AgentSort; onExpand: () => void }) {
-  const selectProject = useWorkspace((s) => s.selectProject);
-  const openBeside = useWorkspace((s) => s.openBeside);
-  const activate = useWorkspace((s) => s.activate);
-  const active = useWorkspace((s) => s.activeSession);
-  const agents = sortAgents(model.agents, sort);
-
-  return (
-    <aside className="sb sb-compact" aria-label="Sidebar (compact)">
-      <button type="button" className="sb-cell" onClick={onExpand} title="Expand the sidebar" aria-label="Expand the sidebar">
-        »
-      </button>
-      {model.needing > 0 && (
-        <span className="sb-needs text-center" title={`${model.needing} need you`}>
-          {model.needing}
-        </span>
-      )}
-      <div className="sb-scroll" style={{ flex: "0 1 auto", maxHeight: "55%" }}>
-        {model.machines.flatMap((m) =>
-          m.spaces.map((sp) => (
-            <button
-              key={sp.project.id}
-              type="button"
-              className="sb-cell"
-              data-active={model.layout.activeProject === sp.project.id}
-              data-shown={model.tiles.has(sp.project.id) ? true : undefined}
-              onClick={(e) => ((isMac() ? e.metaKey : e.ctrlKey) ? openBeside(sp.project.id) : selectProject(sp.project.id))}
-              title={`${sp.number} ${sp.project.label} — ${serverLabel(m.server)}${model.tiles.has(sp.project.id) ? `\non screen, tile ${model.tiles.get(sp.project.id)}` : ""}${sp.state ? `\n${STATE_LABEL[sp.state]}` : ""}`}
-            >
-              <span>{sp.number}</span>
-              <StateMark state={sp.state} />
-            </button>
-          )),
-        )}
-      </div>
-      <div className="sb-rule" />
-      <div className="sb-scroll" style={{ flex: "1 1 0%", maxHeight: "45%" }}>
-        {agents.map((a) => (
-          <button
-            key={a.session.id}
-            type="button"
-            className="sb-cell"
-            data-active={a.session.id === active}
-            onClick={() => activate(a.session.id)}
-            title={`${a.where}\n${a.session.name}\n${STATE_LABEL[a.state]}`}
-          >
-            <StateMark state={a.state} />
-          </button>
-        ))}
-      </div>
-    </aside>
-  );
-}
-
 // ── the sidebar ──────────────────────────────────────────────────────────────
 
 export function WorkspaceRail({
@@ -1208,7 +1153,6 @@ export function WorkspaceRail({
   onNewProject: (serverId: string) => void;
 }) {
   const servers = useWorkspace((s) => s.servers);
-  const collapsed = useWorkspace((s) => s.railCollapsed);
   const toggleRail = useWorkspace((s) => s.toggleRail);
   const active = useWorkspace((s) => s.activeSession);
   const { width: railWidth, startResize } = useRailWidth("rmux.rail.width", RAIL_DEFAULT);
@@ -1238,7 +1182,7 @@ export function WorkspaceRail({
   // already), and briefly flashed so the eye lands on it. Unfolding is
   // remembered like a manual unfold: it is what the operator would have done.
   useEffect(() => {
-    if (!active || collapsed) return;
+    if (!active) return;
     const st = useWorkspace.getState();
     const session = st.sessions.find((x) => x.id === active);
     const project = session && st.projects.find((x) => x.id === session.projectId);
@@ -1276,11 +1220,11 @@ export function WorkspaceRail({
     // Only a change of session should move the sidebar; folding by hand
     // afterwards must not be undone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, collapsed]);
+  }, [active]);
 
-  // Branch lines are drawn only at full width; the compact column has none, so
-  // it does not poll (a widget that is not shown must not run).
-  useBranchPoll(!collapsed);
+  // Hidden, the sidebar is not mounted at all (`Workbench`), so this poll stops
+  // with it — a widget that is not shown must not run.
+  useBranchPoll(true);
 
   const startSplit = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -1300,8 +1244,6 @@ export function WorkspaceRail({
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
-
-  if (collapsed) return <CompactRail model={model} sort={sort} onExpand={toggleRail} />;
 
   const agents = sortAgents(model.agents, sort);
   const pct = `${(split * 100).toFixed(2)}%`;
@@ -1407,7 +1349,7 @@ export function WorkspaceRail({
         <button type="button" onClick={onConnectServer} title="Connect a server (⌘N)">
           {" new"}
         </button>
-        <button type="button" onClick={toggleRail} title="Collapse the sidebar" aria-label="Collapse the sidebar">
+        <button type="button" onClick={toggleRail} title="Hide the sidebar — the footer's left icon brings it back" aria-label="Hide the sidebar">
           «
         </button>
       </div>

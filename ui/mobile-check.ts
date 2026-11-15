@@ -13,6 +13,7 @@ import { groupSessions, serverLabel, totalNeedsYou } from "./src/lib/mobile-sess
 import { shapeBubbles, summarise, toolsLabel, type EntryLike } from "./src/lib/chat-bubbles.ts";
 import { isNearBottom, mayFetch, planUpdate } from "./src/lib/chat-scroll.ts";
 import { canSend, composerHeight, composerKey, QUICK_KEYS } from "./src/lib/composer-keys.ts";
+import { liveFilter, liveKind, planLiveSync } from "./src/lib/mobile-live.ts";
 
 export function run(log: (line: string) => void): boolean {
   let failures = 0;
@@ -127,6 +128,37 @@ export function run(log: (line: string) => void): boolean {
     "quick keys are the asked-for set",
     QUICK_KEYS.map((q) => q.name).join() === "1,2,3,up,down,enter,esc",
   );
+
+  // ── live list (#17) ───────────────────────────────────────────────────────
+  const hostRow = (name: string, command = "bash", alias: string | null = null, cwd: string | null = "/w") =>
+    ({ name, command, alias, cwd });
+  const localRows = [
+    { id: "s1", key: "claude-s1", serverId: "local" },
+    { id: "t1", key: "term-1", serverId: "local" },
+    { id: "r1", key: "claude-r1", serverId: "remote" },
+  ];
+  const plan = planLiveSync("local", localRows, [
+    hostRow("claude-s1", "claude"),
+    hostRow("claude-new", "CLAUDE_CODE_NO_FLICKER=1 claude --resume x", "Named elsewhere"),
+    hostRow("claude-new"),
+    hostRow("companion-s1"),
+    hostRow("pi-p1", "pi --session x", null, null),
+  ]);
+  check("a row already here is not adopted again", !plan.adopt.some((a) => a.hostName === "claude-s1"));
+  check("a new host session is adopted once", plan.adopt.filter((a) => a.hostName === "claude-new").length === 1);
+  check("an rmux launch line adopts as claude", plan.adopt.find((a) => a.hostName === "claude-new")?.kind === "claude");
+  check("the host alias names it", plan.adopt.find((a) => a.hostName === "claude-new")?.alias === "Named elsewhere");
+  check("companion shells are not listed", !plan.adopt.some((a) => a.hostName.startsWith("companion-")));
+  check("pi adopts as pi", plan.adopt.find((a) => a.hostName === "pi-p1")?.kind === "pi" && liveKind("pi") === "pi");
+  check("unknown cwd is null, not empty", plan.adopt.find((a) => a.hostName === "pi-p1")?.cwd === null);
+  check("a same-named row on another server does not block adoption",
+    planLiveSync("local", [{ id: "x", key: "claude-new", serverId: "remote" }], [hostRow("claude-new", "claude")]).adopt.length === 1);
+  const shownRows = liveFilter(localRows, "local", new Set(["claude-s1"]));
+  check("an ended session on that server is hidden", !shownRows.some((r) => r.id === "t1"));
+  check("a live one stays", shownRows.some((r) => r.id === "s1"));
+  check("other servers are untouched", shownRows.some((r) => r.id === "r1"));
+  check("no answer yet hides nothing", liveFilter(localRows, "local", undefined).length === localRows.length);
+  check("the filter returns copies, not the input", liveFilter(localRows, "local", undefined) !== localRows);
 
   log("");
   log(failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`);

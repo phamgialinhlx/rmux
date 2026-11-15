@@ -502,7 +502,10 @@ Host panel, Jira, Progress, mosh, the web build). The decision is the operator's
   them. Corners use `--radius`; SIGNAL ROOM sets it to 0.
 - **The sidebar is herdr's**: spaces (projects with branch ↑ahead ↓behind, polled lightly via
   `git_branch` — `--no-optional-locks`, never for a disconnected server) and agents (grouped or
-  by priority), collapsing to a numbered rail.
+  by priority). Hiding it (and the instruments rail) hides it **completely** — unmounted, no
+  numbered strip, no border left behind, so its polls stop and the panes take the width. ⌘B /
+  ⌘⇧R on macOS, Ctrl+Shift+S / Ctrl+Shift+D elsewhere, `ctrl+b b` / `ctrl+b i`, and the
+  footer's two edge icons, which are always shown.
 
 - **Several projects can be on screen at once** (`Layout.view`, a `ProjectTree` reusing the
   same generic split code). `activeProject` is the focused tile; a project appears in at most
@@ -552,7 +555,11 @@ The blur we want already happened, in the compositor, before the webview drew an
 cost is real and accepted — there is no per-panel frost, so the whole window shares one
 material. There is no Frost setting either, because it drove `--app-blur` and would now be a
 dead knob. Stored tints are clamped: a 64% saved against the old opaque blur layer looks
-nearly solid without it. Fonts (SFU Futura, IBM Plex Mono) are bundled, never
+nearly solid without it. **Under a picture background, text-bearing chrome (sidebars, title bar,
+tab bar, pane headers, footer) never drops below `PICTURE_CHROME_FLOOR` (90%) tint** — a photo is
+page content behind text, and a translucent panel over it cannot guarantee contrast; 90% is the
+measured lowest at which body text holds 4.5:1 and `--text-faint` 3:1 over a near-white photo
+(85% left the sidebar at 2.84:1). Pane bodies keep the slider's tint. Fonts (SFU Futura, IBM Plex Mono) are bundled, never
 fetched from a CDN; this app must look right with no network.
 
 **The terminals are part of the appearance system, not exempt from it.** They were the one

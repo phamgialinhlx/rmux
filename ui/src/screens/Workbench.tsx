@@ -25,6 +25,7 @@ import { QuickSwitch } from "../components/QuickSwitch";
 import { QuickOpen } from "../components/QuickOpen";
 import { startStatusWatch } from "../lib/status-watch";
 import { startChildrenWatch } from "../lib/children-watch";
+import { startAliasSync } from "../lib/alias-watch";
 import { useAutoBridge } from "../lib/redstone-auto-bridge";
 import { api, isTauri, type LockStatus, type SignedIn } from "../lib/api";
 import { SignIn } from "../components/SignIn";
@@ -54,6 +55,7 @@ export function Workbench({
   // Sub-sessions agents spawn on their hosts (`rmux spawn`) appear beside their
   // parent pane without taking focus. See `lib/children-watch.ts`.
   useEffect(() => startChildrenWatch(), []);
+  useEffect(() => startAliasSync(), []);
   // One watcher for the whole app: attention is singular, so counting it per
   // pane would credit every mounted session at once. See `lib/attention.ts`.
   useEffect(() => startAttentionWatch(), []);
@@ -330,18 +332,27 @@ export function Workbench({
           </ErrorBoundary>
         ) : (
         <div className="flex min-h-0 flex-1">
-          <WorkspaceRail
-            onConnectServer={() => setNewMode({ kind: "server" })}
-            onNewProject={(serverId) => setNewMode({ kind: "project", serverId })}
-          />
+          {/* Hidden means gone: not a numbered strip, not a zero-width box with
+              a border — unmounted, so the panes take the whole width and its
+              branch poll stops. The footer's left icon is the way back. */}
+          {!railCollapsed && (
+            <WorkspaceRail
+              onConnectServer={() => setNewMode({ kind: "server" })}
+              onNewProject={(serverId) => setNewMode({ kind: "project", serverId })}
+            />
+          )}
 
           <ErrorBoundary label="The workbench">
             <WorkspaceDeck />
           </ErrorBoundary>
 
-          <ErrorBoundary label="Instruments">
-            <WidgetRail session={activeCtx} />
-          </ErrorBoundary>
+          {/* Same rule as the left: hidden is unmounted, so the instruments'
+              pollers stop (off means off) and no border is left behind. */}
+          {!widgetsCollapsed && (
+            <ErrorBoundary label="Instruments">
+              <WidgetRail session={activeCtx} />
+            </ErrorBoundary>
+          )}
         </div>
         )}
 

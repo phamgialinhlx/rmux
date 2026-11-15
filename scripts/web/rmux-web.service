@@ -1,0 +1,19 @@
+# rmux-web — the desktop UI in a browser. A systemd *user* unit: it runs as you,
+# with your sessions, and survives logout once lingering is enabled
+# (`sudo loginctl enable-linger $USER`). Installed by install.sh.
+#
+# Loopback only. Reach it through an SSH tunnel, cloudflared or Tailscale — see
+# docs/rmux-web.md. Extra flags (Cloudflare Access, a different port) go in
+# ~/.rmux-web/env as RMUX_WEB_ARGS="...".
+[Unit]
+Description=rmux-web (desktop UI)
+After=network-online.target
+
+[Service]
+EnvironmentFile=-%h/.rmux-web/env
+ExecStart=%h/.rmux-web/rmux-web --ui %h/.rmux-web/ui --resources %h/.rmux-web/resources --token-file %h/.rmux-web/token --listen 127.0.0.1:47110 $RMUX_WEB_ARGS
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

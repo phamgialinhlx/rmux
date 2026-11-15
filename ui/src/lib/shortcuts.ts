@@ -78,7 +78,9 @@ export type ActionId =
   | "quickSwitch"
   | "quickOpen"
   | "tile.openBeside"
-  | "tile.close";
+  | "tile.close"
+  | "sidebar.left"
+  | "sidebar.right";
 
 export type Action = { id: ActionId; label: string; hint: string };
 
@@ -110,6 +112,8 @@ export const ACTIONS: readonly Action[] = [
   { id: "progress", label: "Progress", hint: "Open or close the Progress page" },
   { id: "tile.openBeside", label: "Project beside", hint: "Open the next project not on screen in a tile beside this one" },
   { id: "tile.close", label: "Close tile", hint: "Take this project off the screen — its sessions keep running" },
+  { id: "sidebar.left", label: "Servers sidebar", hint: "Hide or show the left sidebar — hidden means gone, the panes take the width" },
+  { id: "sidebar.right", label: "Instruments sidebar", hint: "Hide or show the right sidebar — hidden instruments stop running" },
   { id: "quickSwitch", label: "Go to…", hint: "Search every session and project and jump to it (in the editor, Monaco keeps this chord)" },
   { id: "quickOpen", label: "Open file…", hint: "Fuzzy-find a file in this project and open it — works from inside the editor too" },
 ];
@@ -184,6 +188,13 @@ const MAC_DEFAULTS: Record<ActionId, string> = {
   // nothing in xterm, so both are free of the terminal.
   "tile.openBeside": "Mod+Shift+B",
   "tile.close": "Mod+Shift+Backspace",
+  // ⌘B is VS Code's sidebar toggle. Its secondary-sidebar twin ⌥⌘B is not
+  // used: any Alt chord is one `reachesTerminal` cannot clear (⌥ is meta to
+  // xterm, unmeasured under ⌘), and on macOS ⌥ turns the B into `∫` before
+  // `accelOf` sees it. ⌘⇧B is already "project beside", so the right sidebar
+  // is ⌘⇧R — R for right. None is in the app menu and Monaco binds none.
+  "sidebar.left": "Mod+B",
+  "sidebar.right": "Mod+Shift+R",
 };
 
 /**
@@ -238,6 +249,14 @@ const TERMINAL_SAFE_DEFAULTS: Record<ActionId, string> = {
   // Ctrl+Shift+V — that is paste in every Linux terminal.
   "tile.openBeside": "Mod+Shift+B",
   "tile.close": "Mod+Shift+Q",
+  // VS Code's Ctrl+B / Ctrl+Alt+B are both terminal bytes here (`\x02` is the
+  // prefix key itself). Ctrl+Shift+B is "project beside", and Ctrl+Shift+R is
+  // a hard reload in WebView2, so the pair sits on S and the key to its right
+  // — the left sidebar on the left key. Both are the Ctrl+Shift+letter shape
+  // xterm leaves alone (`reachesTerminal`, and the real-xterm survey in
+  // `shortcut-terminal-check.ts`).
+  "sidebar.left": "Mod+Shift+S",
+  "sidebar.right": "Mod+Shift+D",
 };
 
 /** Progress's default before quick open took it — see `readBindings`. */
