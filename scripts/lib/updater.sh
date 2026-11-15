@@ -14,7 +14,7 @@
 # The key reaches `tauri signer sign` through its environment, never argv
 # (`ps` shows argv to every account on the machine).
 
-REPO="${RMUX_RELEASE_REPO:-phamgialinhlx/iShowManagement}"
+REPO="${RMUX_RELEASE_REPO:-phamgialinhlx/rmux}"
 UPDATER_KEY="${RMUX_UPDATER_KEY:-$HOME/.tauri/rmux-updater.key}"
 
 updater_key_check() {

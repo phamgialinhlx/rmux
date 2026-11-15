@@ -89,7 +89,7 @@ fn the_shipped_public_key_verifies_the_release_key() {
     let pubkey_b64 = conf["plugins"]["updater"]["pubkey"].as_str().expect("plugins.updater.pubkey");
     assert_eq!(
         conf["plugins"]["updater"]["endpoints"][0].as_str(),
-        Some("https://github.com/phamgialinhlx/iShowManagement/releases/latest/download/latest.json")
+        Some("https://github.com/phamgialinhlx/rmux/releases/latest/download/latest.json")
     );
 
     let b64 = base64::engine::general_purpose::STANDARD;

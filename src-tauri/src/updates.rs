@@ -42,7 +42,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use tauri_plugin_updater::UpdaterExt;
 
 /// The repository releases are published to.
-pub const REPO: &str = "phamgialinhlx/iShowManagement";
+pub const REPO: &str = "phamgialinhlx/rmux";
 /// Event every window listens on for the current [`Status`].
 pub const EVENT: &str = "rmux-update";
 /// This build's version.
